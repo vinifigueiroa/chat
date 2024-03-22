@@ -117,55 +117,79 @@ class CLChatClient {
             return;
         }
 
+        // Create threads for sending and receiving messages
+        Thread sendThread = new Thread(new SendMessageTask(outgoing));
+        Thread receiveThread = new Thread(new ReceiveMessageTask(incoming));
+
+        // Start both threads
+        sendThread.start();
+        receiveThread.start();
+
+
+
         /* Exchange messages with the other end of the connection until one side or 
            the other closes the connection.  This client program sends the first message.
            After that,  messages alternate strictly back and forth. */
-
-        try {
-            userInput = new Scanner(System.in);
-            System.out.println("NOTE: Enter 'quit' to end the program.\n");
-            while (true) {
-                System.out.print("SEND:      ");
-                messageOut = userInput.nextLine();
-                if (messageOut.equalsIgnoreCase("quit"))  {
-                        // User wants to quit.  Inform the other side
-                        // of the connection, then close the connection.
-                    outgoing.println(CLOSE);
-                    outgoing.flush();
-                    connection.close();
-                    System.out.println("Connection closed.");
-                    break;
-                }
-                outgoing.println(MESSAGE + messageOut);
-                outgoing.flush();
-                if (outgoing.checkError()) {
-                    throw new IOException("Error occurred while transmitting message.");
-                }
-                System.out.println("WAITING...");
-                messageIn = incoming.readLine();
-                if (messageIn.length() > 0) {
-                        // The first character of the message is a command. If 
-                        // the command is CLOSE, then the connection is closed.  
-                        // Otherwise, remove the command character from the 
-                        // message and proceed.
-                    if (messageIn.charAt(0) == CLOSE) {
-                        System.out.println("Connection closed at other end.");
-                        connection.close();
-                        break;
-                    }
-                    messageIn = messageIn.substring(1);
-                }
-                System.out.println("RECEIVED:  " + messageIn);
-            }
-        }
-        catch (Exception e) {
-            System.out.println("Sorry, an error has occurred.  Connection lost.");
-            System.out.println(e.toString());
-            System.exit(1);
-        }
 
     }  // end main()
 
 
 
 } //end class CLChatClient
+
+// Runnable task for sending messages
+class SendMessageTask implements Runnable {
+    private PrintWriter outgoing;
+
+    public SendMessageTask(PrintWriter outgoing) {
+        this.outgoing = outgoing;
+    }
+
+    @Override
+    public void run() {
+        try {
+            Scanner userInput = new Scanner(System.in);
+            while (true) {
+                System.out.print("SEND:      ");
+                String messageOut = userInput.nextLine();
+                if (messageOut.equalsIgnoreCase("quit")) {
+                    outgoing.println(CLChatClient.CLOSE);
+                    outgoing.flush();
+                    break;
+                }
+                outgoing.println(CLChatClient.MESSAGE + messageOut);
+                outgoing.flush();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+class ReceiveMessageTask implements Runnable {
+    private BufferedReader incoming;
+
+    public ReceiveMessageTask(BufferedReader incoming) {
+        this.incoming = incoming;
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (true) {
+                String messageIn = incoming.readLine();
+                if (messageIn == null) {
+                    break;
+                }
+                if (messageIn.length() > 0 && messageIn.charAt(0) == CLChatClient.CLOSE) {
+                    System.out.println("Connection closed at other end.");
+                    break;
+                }
+                messageIn = messageIn.substring(1);
+                System.out.println("RECEIVED:  " + messageIn);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
